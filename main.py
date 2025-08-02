@@ -108,3 +108,61 @@ def get_weather_forecast(target_date: str):
     temp = closest["main"]["temp"]
     print("Temperatura más cercana a", target_date, ":", temp)
     return {"temp": temp}
+
+
+@app.get("/consumo_diario")
+def consumo_diario():
+    docs = db.collection("consumo_diario").stream()
+    resultados = []
+    for doc in docs:
+        data = doc.to_dict()
+        resultados.append({
+            "date": data.get("date"),
+            "El_dorado": data.get("El_dorado", {}).get("total_litros", 0),
+            "Manzanares": data.get("Manzanares", {}).get("total_litros", 0)
+        })
+    resultados.sort(key=lambda x: x["date"])
+    return resultados
+
+@app.get("/temp_vs_consumo")
+def temp_vs_consumo():
+    docs = db.collection("consumo_diario").stream()
+    resultados = []
+    for doc in docs:
+        data = doc.to_dict()
+        total_litros = (
+            data.get("El_dorado", {}).get("total_litros", 0)
+            + data.get("Manzanares", {}).get("total_litros", 0)
+        )
+        resultados.append({
+            "date": data.get("date"),
+            "temperatura": data.get("temperatura", 0),
+            "consumo_total": total_litros
+        })
+    resultados.sort(key=lambda x: x["date"])
+    return resultados
+
+
+@app.get("/participacion_vecindario")
+def participacion_vecindario():
+    docs = db.collection("consumo_diario").stream()
+    total_dorado = 0
+    total_manzanares = 0
+
+    for doc in docs:
+        data = doc.to_dict()
+        total_dorado += data.get("El_dorado", {}).get("total_litros", 0)
+        total_manzanares += data.get("Manzanares", {}).get("total_litros", 0)
+
+    total_general = total_dorado + total_manzanares
+
+    if total_general == 0:
+        return {"error": "No hay datos suficientes."}
+
+    participacion = {
+        "El_dorado": round((total_dorado / total_general) * 100, 2),
+        "Manzanares": round((total_manzanares / total_general) * 100, 2),
+        "total_litros": total_general
+    }
+
+    return participacion
